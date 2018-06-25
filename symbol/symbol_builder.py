@@ -1,5 +1,6 @@
 import mxnet as mx
-from common import multi_layer_feature, multibox_layer
+from symbol.common import multi_layer_feature, multibox_layer
+from operator_py.focal_loss_layer import *
 
 
 def import_module(module_name):
@@ -71,6 +72,7 @@ def get_symbol_train(network, num_classes, from_layers, num_filters, strides, pa
     loc_preds, cls_preds, anchor_boxes = multibox_layer(layers, \
         num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
         num_channels=num_filters, clip=False, interm_layer=0, steps=steps)
+    # now cls_preds are in shape of  batchsize x num_class x num_anchors
 
     tmp = mx.contrib.symbol.MultiBoxTarget(
         *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
@@ -80,6 +82,11 @@ def get_symbol_train(network, num_classes, from_layers, num_filters, strides, pa
     loc_target = tmp[0]
     loc_target_mask = tmp[1]
     cls_target = tmp[2]
+
+    # focal loss, bad
+    # cls_prob_ = mx.sym.SoftmaxActivation(cls_preds, mode='channel')
+    # cls_prob = mx.sym.Custom(cls_preds, cls_prob_, cls_target, op_type='focal_loss', name='cls_prob',
+    #                          gamma=2.0, alpha=0.25, normalize=True)
 
     cls_prob = mx.symbol.SoftmaxOutput(data=cls_preds, label=cls_target, \
         ignore_label=-1, use_ignore=True, grad_scale=1., multi_output=True, \

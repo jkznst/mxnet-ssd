@@ -116,8 +116,16 @@ if __name__ == '__main__':
     # final validation - sometimes __path__ (or __file__) gives 'mxnet/python/mxnet' instead of 'mxnet'
     if not os.path.exists(im2rec_path):
         im2rec_path = os.path.join(os.path.dirname(os.path.dirname(mxnet.__path__[0])), 'tools/im2rec.py')
-    subprocess.check_call(["python", im2rec_path,
-        os.path.abspath(args.target), os.path.abspath(args.root_path),
-        "--shuffle", str(int(args.shuffle)), "--pack-label", "1"])
+    # subprocess.check_call(["python", im2rec_path,
+    #     os.path.abspath(args.target), os.path.abspath(args.root_path),
+    #     "--shuffle", str(int(args.shuffle)), "--pack-label", "1"])
+    if args.shuffle:
+        subprocess.check_call(["python", im2rec_path,
+                           os.path.abspath(args.target), os.path.abspath(args.root_path),
+                           "--pack-label"])
+    else:
+        subprocess.check_call(["python", im2rec_path,
+                               os.path.abspath(args.target), os.path.abspath(args.root_path),
+                               "--no-shuffle", "--pack-label"])
 
     print("Record file {} generated...".format(args.target.split('.')[0] + '.rec'))

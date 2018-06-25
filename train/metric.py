@@ -43,7 +43,7 @@ class MultiBoxMetric(mx.metric.EvalMetric):
         self.num_inst[0] += valid_count
         # smoothl1loss
         self.sum_metric[1] += np.sum(loc_loss)
-        self.num_inst[1] += valid_count
+        self.num_inst[1] += np.sum(cls_label > 0)
 
     def get(self):
         """Get the current evaluation result.

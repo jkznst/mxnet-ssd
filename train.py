@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--prefix', dest='prefix', help='new model prefix',
                         default=os.path.join(os.getcwd(), 'output', 'exp1', 'ssd'), type=str)
     parser.add_argument('--gpus', dest='gpus', help='GPU devices to train with',
-                        default='0', type=str)
+                        default='1', type=str)
     parser.add_argument('--begin-epoch', dest='begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end-epoch', dest='end_epoch', help='end epoch of training',
@@ -89,7 +89,7 @@ def parse_args():
                         help='use difficult ground-truths in evaluation')
     parser.add_argument('--voc07', dest='use_voc07_metric', type=bool, default=True,
                         help='use PASCAL VOC 07 11-point metric')
-    parser.add_argument('--tensorboard', dest='tensorboard', type=bool, default=False,
+    parser.add_argument('--tensorboard', dest='tensorboard', type=bool, default=True,
                         help='save metrics into tensorboard readable files')
     parser.add_argument('--min_neg_samples', dest='min_neg_samples', type=int, default=0,
                         help='min number of negative samples taken in hard mining.')

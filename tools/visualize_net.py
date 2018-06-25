@@ -1,10 +1,10 @@
 from __future__ import print_function
-import find_mxnet
+import tools.find_mxnet
 import mxnet as mx
 import argparse
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'symbol'))
-import symbol_factory
+import symbol.symbol_factory as symbol_factory
 
 def parse_args():
     parser = argparse.ArgumentParser(description='network visualization')

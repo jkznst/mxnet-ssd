@@ -108,7 +108,7 @@ def train_net(network, train_path, num_classes, batch_size,
               prefix, ctx, begin_epoch, end_epoch, frequent, learning_rate,
               momentum, weight_decay, lr_refactor_step, lr_refactor_ratio,
               freeze_layer_pattern='',
-              num_example=10000, label_pad_width=350,
+              num_example=5717, label_pad_width=350,
               nms_thresh=0.45, force_nms=False, ovp_thresh=0.5,
               use_difficult=False, class_names=None,
               voc07_metric=False, nms_topk=400, force_suppress=False,
@@ -282,8 +282,8 @@ def train_net(network, train_path, num_classes, batch_size,
     # visualize net - both train and test
     net_visualization(net=net, network=network,data_shape=data_shape[2],
                       output_dir=os.path.dirname(prefix), train=True)
-    net_visualization(net=None, network=network, data_shape=data_shape[2],
-                      output_dir=os.path.dirname(prefix), train=False, num_classes=num_classes)
+    # net_visualization(net=None, network=network, data_shape=data_shape[2],
+    #                   output_dir=os.path.dirname(prefix), train=False, num_classes=num_classes)
 
     # init training module
     mod = mx.mod.Module(net, label_names=('label',), logger=logger, context=ctx,

@@ -1,5 +1,40 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import mxnet as mx
 import numpy as np
+
+
+@mx.init.register
+class FocalBiasInit(mx.init.Initializer):
+    '''
+    Initialize bias according to Focal Loss.
+    '''
+    def __init__(self, num_classes, pi=0.01):
+        super(FocalBiasInit, self).__init__(num_classes=num_classes, pi=pi)
+        self._num_classes = num_classes
+        self._pi = pi
+
+    def _init_weight(self, _, arr):
+        data = np.full((arr.size,), -np.log((1.0 - self._pi) / self._pi))
+        data = np.reshape(data, (-1, self._num_classes))
+        data[:, 0] = 0
+        arr[:] = data.ravel()
+
 
 def conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0), \
     stride=(1,1), act_type="relu", use_batchnorm=False):
@@ -254,6 +289,9 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
 
         # create class prediction layer
         num_cls_pred = num_anchors * num_classes
+        # ''' Focal loss related '''
+        # bias = mx.symbol.Variable(name="{}_cls_pred_conv_bias".format(from_name),
+        #     init=FocalBiasInit(num_classes, 0.01), attr={'__lr_mult__': '2.0'})
         bias = mx.symbol.Variable(name="{}_cls_pred_conv_bias".format(from_name),
             init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
         cls_pred = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=(3,3), \

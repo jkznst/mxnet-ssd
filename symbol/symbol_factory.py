@@ -30,7 +30,7 @@ def get_scales(min_scale=0.2, max_scale=0.9,num_layers=6):
     step = int(np.floor((max_ratio - min_ratio) / (num_layers - 2)))
     min_sizes = []
     max_sizes = []
-    for ratio in xrange(min_ratio, max_ratio + 1, step):
+    for ratio in range(min_ratio, max_ratio + 1, step):
         min_sizes.append(ratio / 100.)
         max_sizes.append((ratio + step) / 100.)
     min_sizes = [int(100*min_scale / 2.0) / 100.0] + min_sizes
@@ -119,7 +119,7 @@ def get_config(network, data_shape, **kwargs):
         num_layers = 101
         image_shape = '3,224,224'
         network = 'resnet'
-        from_layers = ['_plus12', '_plus15', '', '', '', '']
+        from_layers = ['_plus29', '_plus32', '', '', '', '']
         num_filters = [-1, -1, 512, 256, 256, 128]
         strides = [-1, -1, 2, 2, 2, 2]
         pads = [-1, -1, 1, 1, 1, 1]
