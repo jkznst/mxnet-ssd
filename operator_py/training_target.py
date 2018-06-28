@@ -2,26 +2,67 @@ import mxnet as mx
 import numpy as np
 
 
+def iou(x, ys):
+    """
+    Calculate intersection-over-union overlap
+    Params:
+    ----------
+    x : numpy.array
+        single box [xmin, ymin ,xmax, ymax]
+    ys : numpy.array
+        multiple box [[xmin, ymin, xmax, ymax], [...], ]
+    Returns:
+    -----------
+    numpy.array
+        [iou1, iou2, ...], size == ys.shape[0]
+    """
+    ixmin = np.maximum(ys[:, 0], x[0])
+    iymin = np.maximum(ys[:, 1], x[1])
+    ixmax = np.minimum(ys[:, 2], x[2])
+    iymax = np.minimum(ys[:, 3], x[3])
+    iw = np.maximum(ixmax - ixmin, 0.)
+    ih = np.maximum(iymax - iymin, 0.)
+    inters = iw * ih
+    uni = (x[2] - x[0]) * (x[3] - x[1]) + (ys[:, 2] - ys[:, 0]) * \
+                                          (ys[:, 3] - ys[:, 1]) - inters
+    ious = inters / uni
+    ious[uni < 1e-6] = 0  # in case bad boxes
+    return ious
+
+
 def bbox_overlaps(boxes, query_boxes):
     """
     determine overlaps between boxes and query_boxes
-    :param boxes: n * 4 bounding boxes
-    :param query_boxes: k * 4 bounding boxes
+    :param boxes: n * 4 bounding boxes, anchors
+    :param query_boxes: k * 4 bounding boxes, gt_boxes
     :return: overlaps: n * k overlaps
     """
     n_ = boxes.shape[0]
+    # print(boxes[0])
     k_ = query_boxes.shape[0]
+    # print(query_boxes)
+
+    # method 1
+    # boxes_bc = np.broadcast_to(boxes.reshape((n_, 1, 4)), shape=(n_, k_, 4))
+    # query_boxes_bc = np.broadcast_to(query_boxes.reshape(1, k_, 4), shape=(n_, k_, 4))
+    # ixmin = np.maximum(boxes_bc[:, :, 0], query_boxes_bc[:, :, 0])
+    # iymin = np.maximum(boxes_bc[:, :, 1], query_boxes_bc[:, :, 1])
+    # ixmax = np.minimum(boxes_bc[:, :, 2], query_boxes_bc[:, :, 2])
+    # iymax = np.minimum(boxes_bc[:, :, 3], query_boxes_bc[:, :, 3])
+    # iw = np.maximum(ixmax - ixmin, 0.)
+    # ih = np.maximum(iymax - iymin, 0.)
+    # inters = iw * ih
+    # uni = (boxes_bc[:, :, 2] - boxes_bc[:, :, 0]) * (boxes_bc[:, :, 3] - boxes_bc[:, :, 1]) + \
+    #       (query_boxes_bc[:, :, 2] - query_boxes_bc[:, :, 0]) * \
+    #         (query_boxes_bc[:, :, 3] - query_boxes_bc[:, :, 1]) - inters
+    # overlaps = inters / uni
+    # overlaps[uni < 1e-6] = 0  # in case bad boxes
+
+    # method 2
     overlaps = np.zeros((n_, k_), dtype=np.float)
     for k in range(k_):
-        query_box_area = (query_boxes[k, 2] - query_boxes[k, 0] + 1) * (query_boxes[k, 3] - query_boxes[k, 1] + 1)
-        for n in range(n_):
-            iw = min(boxes[n, 2], query_boxes[k, 2]) - max(boxes[n, 0], query_boxes[k, 0]) + 1
-            if iw > 0:
-                ih = min(boxes[n, 3], query_boxes[k, 3]) - max(boxes[n, 1], query_boxes[k, 1]) + 1
-                if ih > 0:
-                    box_area = (boxes[n, 2] - boxes[n, 0] + 1) * (boxes[n, 3] - boxes[n, 1] + 1)
-                    all_area = float(box_area + query_box_area - iw * ih)
-                    overlaps[n, k] = iw * ih / all_area
+        ious = iou(x=query_boxes[k], ys=boxes)
+        overlaps[:, k] = ious
     return overlaps
 
 
@@ -34,15 +75,15 @@ def bbox_transform(ex_rois, gt_rois, box_stds):
     """
     assert ex_rois.shape[0] == gt_rois.shape[0], 'inconsistent rois number'
 
-    ex_widths = ex_rois[:, 2] - ex_rois[:, 0] + 1.0
-    ex_heights = ex_rois[:, 3] - ex_rois[:, 1] + 1.0
-    ex_ctr_x = ex_rois[:, 0] + 0.5 * (ex_widths - 1.0)
-    ex_ctr_y = ex_rois[:, 1] + 0.5 * (ex_heights - 1.0)
+    ex_widths = ex_rois[:, 2] - ex_rois[:, 0]
+    ex_heights = ex_rois[:, 3] - ex_rois[:, 1]
+    ex_ctr_x = (ex_rois[:, 0] + ex_rois[:, 2]) * 0.5
+    ex_ctr_y = (ex_rois[:, 1] + ex_rois[:, 3]) * 0.5
 
-    gt_widths = gt_rois[:, 2] - gt_rois[:, 0] + 1.0
-    gt_heights = gt_rois[:, 3] - gt_rois[:, 1] + 1.0
-    gt_ctr_x = gt_rois[:, 0] + 0.5 * (gt_widths - 1.0)
-    gt_ctr_y = gt_rois[:, 1] + 0.5 * (gt_heights - 1.0)
+    gt_widths = gt_rois[:, 2] - gt_rois[:, 0]
+    gt_heights = gt_rois[:, 3] - gt_rois[:, 1]
+    gt_ctr_x = (gt_rois[:, 0] + gt_rois[:, 2]) * 0.5
+    gt_ctr_y = (gt_rois[:, 1] + gt_rois[:, 3]) * 0.5
 
     targets_dx = (gt_ctr_x - ex_ctr_x) / (ex_widths + 1e-14) / box_stds[0]
     targets_dy = (gt_ctr_y - ex_ctr_y) / (ex_heights + 1e-14) / box_stds[1]
@@ -61,7 +102,7 @@ class TrainingTargets(mx.operator.CustomOp):
         self.overlap_threshold = overlap_threshold
         self.negative_mining_ratio = negative_mining_ratio
         self.negative_mining_thresh = negative_mining_thresh
-        self.variances = variances
+        self.variances = [float(i) for i in variances.strip("()").split(",")]
 
         self.eps = 1e-14
 
@@ -70,7 +111,7 @@ class TrainingTargets(mx.operator.CustomOp):
         anchors = in_data[0].asnumpy()    # 1 x num_anchors x 4
         anchors = np.reshape(anchors, newshape=(-1, 4)) # num_anchors x 4
         class_preds = in_data[1].asnumpy()    # batchsize x num_class x num_anchors
-        labels = in_data[2].asnumpy()     # batchsize x 8 x 5
+        labels = in_data[2].asnumpy()     # batchsize x 58 x 6
 
         batchsize = class_preds.shape[0]
         num_class = class_preds.shape[1]    # including background class
@@ -81,16 +122,18 @@ class TrainingTargets(mx.operator.CustomOp):
         box_target = np.zeros((batchsize, num_anchors, 4), dtype=np.float32)
         box_mask = np.zeros((batchsize, num_anchors, 4), dtype=np.float32)
 
-        for cls_preds_per_batch, labels_per_batch, cls_target_per_batch, box_target_per_batch, \
-            box_mask_per_batch in zip(class_preds, labels, cls_target, box_target, box_mask):
+        for nbatch, (cls_preds_per_batch, labels_per_batch) in enumerate(zip(class_preds, labels)):
             # filter out padded gt_boxes with cid -1
             valid_labels = np.where(labels_per_batch[:, 0] >= 0)[0]
-            gt_boxes = labels_per_batch[valid_labels, 1:5]
+            gt_boxes = labels_per_batch[valid_labels, 0:5]
             num_valid_gt = gt_boxes.shape[0]
+            # print("num_valid_gt:", num_valid_gt)
 
             # overlap between the anchors and the gt boxes
             # overlaps (ex, gt)
-            overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes.astype(np.float))
+            overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes[:, 1:5].astype(np.float))
+            # print("overlap > 0:", np.sum(overlaps > 0))
+
             # sample for positive labels
             if num_valid_gt > 0:
                 gt_flags = np.zeros(shape=(num_valid_gt, 1), dtype=np.bool)
@@ -98,21 +141,22 @@ class TrainingTargets(mx.operator.CustomOp):
                 anchor_flags = np.ones(shape=(num_anchors, 1), dtype=np.int8) * -1  # -1 means dont care
                 num_positive = 0
 
-                temp_overlaps = overlaps
                 while np.count_nonzero(gt_flags) < num_valid_gt:
                     # ground-truth not fully matched
                     best_anchor = -1
                     best_gt = -1
                     max_overlap = 1e-6  # start with a very small positive overlap
 
-                    max_iou = np.max(temp_overlaps)
+                    inds_w = np.where(anchor_flags.flatten() != 1)[0]
+                    inds_h = np.where(gt_flags.flatten() != 1)[0]
+                    max_iou = np.max(overlaps[inds_w, :][:, inds_h])
                     if max_iou > max_overlap:
                         max_overlap = max_iou
-                        best_anchor, best_gt = np.where(temp_overlaps == max_overlap)
+                        best_anchor, best_gt = np.where((overlaps == max_overlap) & \
+                                                        (anchor_flags != 1) & \
+                                                        (gt_flags != 1).transpose())
                         best_anchor = best_anchor[0]
                         best_gt = best_gt[0]
-                        temp_overlaps[:, best_gt] = -1
-                        temp_overlaps[best_anchor, :] = -1
 
                     if int(best_anchor) == -1:
                         assert int(best_gt) == -1
@@ -124,14 +168,20 @@ class TrainingTargets(mx.operator.CustomOp):
                         max_matches[best_anchor, 1] = best_gt
                         num_positive += 1
                         # mark as visited
+                        # print("visited!!")
                         gt_flags[best_gt] = True
                         anchor_flags[best_anchor] = 1
                 # end while
+                # print("overlap > 0:", np.sum(overlaps > 0))
+
+                # print(np.sum((anchor_flags.astype(np.int8) > 0)))
+                # print("after max, num of positive anchors:", np.sum((anchor_flags.flatten() == 1)))
 
                 assert self.overlap_threshold > 0
                 # find positive matches based on overlaps
                 max_iou = np.max(overlaps, axis=1)
                 best_gt = np.argmax(overlaps, axis=1)
+
 
                 max_matches[:, 0] = np.where(anchor_flags.flatten() == 1, max_matches[:, 0], max_iou)
                 max_matches[:, 1] = np.where(anchor_flags.flatten() == 1, max_matches[:, 1], best_gt)
@@ -141,92 +191,97 @@ class TrainingTargets(mx.operator.CustomOp):
                 # mark as visited
                 gt_flags[best_gt[overlap_inds]] = True
                 anchor_flags[overlap_inds] = 1
-
-                # for j in range(num_anchors):
-                #     if int(anchor_flags[j]) == 1:
-                #         continue    # already matched this anchor
-                #
-                #     if max_iou[j] > self.overlap_threshold:
-                #         num_positive += 1
-                #         # mark as visited
-                #         gt_flags[best_gt[j]] = True
-                #         anchor_flags[j] = 1
+                # print("after overlap, num of positive anchors:", np.sum((anchor_flags.flatten() == 1)))
 
                 if self.negative_mining_ratio > 0:
                     assert self.negative_mining_thresh > 0
-                    num_negative = num_positive * self.negative_mining_ratio
+                    num_negative = int(num_positive * self.negative_mining_ratio)
                     if num_negative > (num_anchors - num_positive):
                         num_negative = num_anchors - num_positive
 
                     if num_negative > 0:
                         # use negative mining, pick "best" negative samples
-                        bg_probs = []
-                        for j in range(num_anchors):
-                            if int(anchor_flags[j]) == 1:
-                                continue # already matched this anchor
-                            if max_matches[j, 0] < 0:
-                                # not yet calculated
-                                best_gt = -1
-                                max_iou = -1.0
-
-                                iou = np.max(overlaps[j])
-                                if iou > max_iou:
-                                    max_iou = iou
-                                    best_gt = np.argmax(overlaps[j])
-
-                                if int(best_gt) != -1:
-                                    assert int(max_matches[j, 0]) == -1
-                                    assert int(max_matches[j, 1]) == -1
-                                    max_matches[j, 0] = max_iou
-                                    max_matches[j, 1] = best_gt
-
-                            if (max_matches[j, 0] < self.negative_mining_thresh) & \
-                                (int(anchor_flags[j]) == -1):
-                                # calculate class predictions
-                                # max_val = cls_preds_per_batch[0, j] # background cls preds
-                                max_val = np.max(cls_preds_per_batch[:, j])
-                                # for k in range(1, num_class):
-                                #     tmp = cls_preds_per_batch[k, j]
-                                #     if tmp > max_val:
-                                #         max_val = tmp
-
-                                p_sum = np.sum(np.exp(cls_preds_per_batch[:, j] - max_val))
-                                # for k in range(num_class):
-                                #     tmp = cls_preds_per_batch[k, j]
-                                #     p_sum += np.exp(tmp - max_val)
-
-                                bg_prob = np.exp(cls_preds_per_batch[0, j] - max_val) / p_sum
-                                # loss should be -log(x), but value does not matter, skip log
-                                bg_probs += [bg_prob, j]
+                        inds = np.where((anchor_flags.flatten() != 1) &
+                                        (max_matches[:, 0] < self.negative_mining_thresh) &
+                                        (anchor_flags.flatten() == -1))[0]
+                        max_val = np.amax(cls_preds_per_batch[:, inds], axis=0)
+                        p_sum = np.sum(np.exp(cls_preds_per_batch[:, inds] - max_val), axis=0)
+                        bg_prob = np.exp(cls_preds_per_batch[0, inds] - max_val) / p_sum
+                        bg_probs = np.vstack((bg_prob, inds)).transpose()
+                        # for j in range(num_anchors):
+                        #     if int(anchor_flags[j]) == 1:
+                        #         continue # already matched this anchor
+                        #     # if max_matches[j, 0] < 0:
+                        #     #     # not yet calculated
+                        #     #     best_gt = -1
+                        #     #     max_iou = -1.0
+                        #     #
+                        #     #     iou = np.max(overlaps[j])
+                        #     #     if iou > max_iou:
+                        #     #         max_iou = iou
+                        #     #         best_gt = np.argmax(overlaps[j])
+                        #     #
+                        #     #     if int(best_gt) != -1:
+                        #     #         assert int(max_matches[j, 0]) == -1
+                        #     #         assert int(max_matches[j, 1]) == -1
+                        #     #         max_matches[j, 0] = max_iou
+                        #     #         max_matches[j, 1] = best_gt
+                        #
+                        #     if (max_matches[j, 0] < self.negative_mining_thresh) & \
+                        #         (int(anchor_flags[j]) == -1):
+                        #         # calculate class predictions
+                        #         # max_val = cls_preds_per_batch[0, j] # background cls preds
+                        #         max_val = np.max(cls_preds_per_batch[:, j])
+                        #         # for k in range(1, num_class):
+                        #         #     tmp = cls_preds_per_batch[k, j]
+                        #         #     if tmp > max_val:
+                        #         #         max_val = tmp
+                        #
+                        #         p_sum = np.sum(np.exp(cls_preds_per_batch[:, j] - max_val))
+                        #         # for k in range(num_class):
+                        #         #     tmp = cls_preds_per_batch[k, j]
+                        #         #     p_sum += np.exp(tmp - max_val)
+                        #
+                        #         bg_prob = np.exp(cls_preds_per_batch[0, j] - max_val) / p_sum
+                        #         # loss should be -log(x), but value does not matter, skip log
+                        #         bg_probs += [bg_prob, j]
                         # end iterate anchors
 
-                        bg_probs = np.reshape(np.array(bg_probs), newshape=(-1,2))
+                        # bg_probs = np.reshape(np.array(bg_probs), newshape=(-1,2))
                         # default ascend order
                         neg_indx = np.lexsort((bg_probs[:, 1].flatten(), bg_probs[:, 0].flatten()))
                         bg_probs = bg_probs[neg_indx]
 
-                        for i in range(int(num_negative)):
-                            anchor_flags[int(bg_probs[i, 1])] = 0 # mark as negative sample
+                        anchor_flags[bg_probs[0:num_negative, 1].astype(np.int32)] = 0  # mark as negative sample
+
+                        # for i in range(int(num_negative)):
+                        #     anchor_flags[int(bg_probs[i, 1])] = 0 # mark as negative sample
 
                 else:
                     # use all negative samples
-                    anchor_flags = np.where(anchor_flags.astype(np.int8) == 1, 1, 0)
+                    anchor_flags = np.where(anchor_flags.astype(np.int8) > 0, 1, 0)
 
                 # assign training target
-                fg_inds = np.where(anchor_flags.astype(np.int8) == 1)[0]
+                fg_inds = np.where(anchor_flags.astype(np.int8) > 0)[0]
                 bg_inds = np.where(anchor_flags.astype(np.int8) == 0)[0]
+                ignore_inds = np.where(anchor_flags.astype(np.int8) < 0)[0]
 
                 # assign class target
-                cls_target_per_batch[fg_inds] = labels_per_batch[max_matches[fg_inds, 1].astype(np.int8), 0] + 1
-                cls_target_per_batch[bg_inds] = 0
+                cls_target[nbatch][fg_inds] = gt_boxes[max_matches[fg_inds, 1].astype(np.int8), 0] + 1
+                cls_target[nbatch][bg_inds] = 0
+                cls_target[nbatch][ignore_inds] = -1
 
                 # assign bbox mask
-                box_mask_per_batch[fg_inds, :] = 1
+                box_mask[nbatch][fg_inds, :] = 1
+                box_mask[nbatch][bg_inds, :] = 0
+                box_mask[nbatch][ignore_inds, :] = 0
 
                 # assign bbox target
-                box_target_per_batch[fg_inds, :] = bbox_transform(anchors[fg_inds, :],
-                                                                  gt_boxes[max_matches[fg_inds, 1].astype(np.int8), :],
-                                                                  box_stds=(1.0, 1.0, 1.0, 1.0))
+                box_target[nbatch][fg_inds, :] = bbox_transform(anchors[fg_inds, :],
+                                                                  gt_boxes[max_matches[fg_inds, 1].astype(np.int8), 1:5],
+                                                                  box_stds=np.array(self.variances))
+                box_target[nbatch][bg_inds, :] = 0
+                box_target[nbatch][ignore_inds, :] = 0
 
         # box_target, box_mask, cls_target = mx.nd.contrib.MultiBoxTarget(anchors, labels, class_preds,
         #                                                                     overlap_threshold=self.overlap_threshold,

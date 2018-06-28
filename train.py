@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--prefix', dest='prefix', help='new model prefix',
                         default=os.path.join(os.getcwd(), 'output', 'exp1', 'ssd'), type=str)
     parser.add_argument('--gpus', dest='gpus', help='GPU devices to train with',
-                        default='1', type=str)
+                        default='0', type=str)
     parser.add_argument('--begin-epoch', dest='begin_epoch', help='begin epoch of training',
                         default=0, type=int)
     parser.add_argument('--end-epoch', dest='end_epoch', help='end epoch of training',

@@ -76,23 +76,24 @@ def get_symbol_train(network, num_classes, from_layers, num_filters, strides, pa
     # now cls_preds are in shape of  batchsize x num_class x num_anchors
 
     # tmp = mx.contrib.symbol.MultiBoxTarget(
-    #     *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
+    #     *[anchor_boxes, label, cls_preds], overlap_threshold=0.5, \
     #     ignore_label=-1, negative_mining_ratio=3, minimum_negative_samples=minimum_negative_samples, \
     #     negative_mining_thresh=.5, variances=(0.1, 0.1, 0.2, 0.2),
     #     name="multibox_target")
-    # loc_target = tmp[0]
-    # loc_target_mask = tmp[1]
-    # cls_target = tmp[2]
+    # loc_target_tmp = tmp[0]
+    # loc_target_mask_tmp = tmp[1]
+    # cls_target_tmp = tmp[2]
 
     loc_target, loc_target_mask, cls_target = mx.symbol.Custom(op_type="training_targets",
                                                                name="training_targets",
                                                                overlap_threshold=0.5,
-                                                               negative_mining_ratio=-1,
+                                                               negative_mining_ratio=3.,
                                                                negative_mining_thresh=0.5,
                                                                variances=(0.1, 0.1, 0.2, 0.2),
                                                                anchors=anchor_boxes,
                                                                cls_preds=cls_preds,
                                                                labels=label)
+
 
     # focal loss, bad
     # cls_prob_ = mx.sym.SoftmaxActivation(cls_preds, mode='channel')
@@ -109,6 +110,8 @@ def get_symbol_train(network, num_classes, from_layers, num_filters, strides, pa
 
     # monitoring training status
     cls_label = mx.symbol.MakeLoss(data=cls_target, grad_scale=0, name="cls_label")
+    # cls_label_tmp = mx.symbol.MakeLoss(data=cls_target_tmp, grad_scale=0, name="cls_label_tmp")
+    # anchors = mx.symbol.MakeLoss(data=anchor_boxes, grad_scale=0, name="anchors")
     det = mx.contrib.symbol.MultiBoxDetection(*[cls_prob, loc_preds, anchor_boxes], \
         name="detection", nms_threshold=nms_thresh, force_suppress=force_suppress,
         variances=(0.1, 0.1, 0.2, 0.2), nms_topk=nms_topk)

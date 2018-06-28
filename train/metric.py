@@ -1,5 +1,6 @@
 import mxnet as mx
 import numpy as np
+from operator_py.training_target import bbox_overlaps
 
 
 class MultiBoxMetric(mx.metric.EvalMetric):
@@ -26,10 +27,26 @@ class MultiBoxMetric(mx.metric.EvalMetric):
         """
         Implementation of updating metrics
         """
+        # labels = labels[0].asnumpy()
+        # valid_labels = np.where(labels[0, :, 0] >= 0)[0]
+        # gt_boxes = labels[0, valid_labels, 0:5]
+        # num_valid_gt = gt_boxes.shape[0]
         # get generated multi label from network
         cls_prob = preds[0].asnumpy()
         loc_loss = preds[1].asnumpy()
         cls_label = preds[2].asnumpy()
+        # cls_label_tmp = preds[4].asnumpy()
+        # anchors = preds[5].asnumpy().reshape((-1,4))
+        # overlaps = bbox_overlaps(anchors.astype(np.float), gt_boxes[:, 1:5].astype(np.float))
+        # print(np.sum(cls_label != cls_label_tmp))
+        # w,h = np.where(cls_label != cls_label_tmp)
+        # print("python:", cls_label[w,h])
+        # print("c++:", cls_label_tmp[w, h])
+        # print(overlaps.max(axis=0))
+        # print(overlaps[h[0], :])
+        # print(overlaps[h[1], :])
+        # print(overlaps[h[2], :])
+        # print(overlaps[h[3], :])
         valid_count = np.sum(cls_label >= 0)
         # overall accuracy & object accuracy
         label = cls_label.flatten()
